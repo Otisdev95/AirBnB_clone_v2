@@ -1,1 +1,1 @@
-This directory contains the HTML files
+This directory implements webpage design.

@@ -1,11 +1,7 @@
 #!/usr/bin/python3
-""" Console Module """
+"""Console Module."""
 import cmd
 import sys
-import re
-import os
-from datetime import datetime
-import uuid
 from models.base_model import BaseModel
 from models import storage
 from models.user import User
@@ -14,28 +10,44 @@ from models.state import State
 from models.city import City
 from models.amenity import Amenity
 from models.review import Review
+import re
+import os
+
+
+def tokenize(args: str) -> list:
+    """Tokenizer.
+
+    Args:
+        args (str): console input
+
+    Returns:
+        list: list of tokens
+    """
+
+    tokens = args.split()
+    return tokens
 
 
 class HBNBCommand(cmd.Cmd):
-    """ Contains the functionality for the HBNB console"""
+    """Contains the functionality for the HBNB console."""
 
     # determines prompt for interactive/non-interactive modes
     prompt = '(hbnb) ' if sys.__stdin__.isatty() else ''
 
     classes = {
-               'BaseModel': BaseModel, 'User': User, 'Place': Place,
-               'State': State, 'City': City, 'Amenity': Amenity,
-               'Review': Review
-              }
+        'BaseModel': BaseModel, 'User': User, 'Place': Place,
+        'State': State, 'City': City, 'Amenity': Amenity,
+        'Review': Review
+    }
     dot_cmds = ['all', 'count', 'show', 'destroy', 'update']
     types = {
-             'number_rooms': int, 'number_bathrooms': int,
-             'max_guest': int, 'price_by_night': int,
-             'latitude': float, 'longitude': float
-            }
+        'number_rooms': int, 'number_bathrooms': int,
+        'max_guest': int, 'price_by_night': int,
+        'latitude': float, 'longitude': float
+    }
 
     def preloop(self):
-        """Prints if isatty is false"""
+        """Print if isatty is false."""
         if not sys.__stdin__.isatty():
             print('(hbnb)')
 
@@ -98,7 +110,7 @@ class HBNBCommand(cmd.Cmd):
 
     def do_quit(self, command):
         """ Method to exit the HBNB console"""
-        exit(0)
+        exit()
 
     def help_quit(self):
         """ Prints the help documentation for quit  """
@@ -107,7 +119,7 @@ class HBNBCommand(cmd.Cmd):
     def do_EOF(self, arg):
         """ Handles EOF to exit program """
         print()
-        exit(0)
+        exit()
 
     def help_EOF(self):
         """ Prints the help documentation for EOF """
@@ -119,62 +131,40 @@ class HBNBCommand(cmd.Cmd):
 
     def do_create(self, args):
         """ Create an object of any class"""
-        ignored_attrs = ('id', 'created_at', 'updated_at', '__class__')
-        class_name = ''
-        name_pattern = r'(?P<name>(?:[a-zA-Z]|_)(?:[a-zA-Z]|\d|_)*)'
-        class_match = re.match(name_pattern, args)
-        obj_kwargs = {}
-        if class_match is not None:
-            class_name = class_match.group('name')
-            params_str = args[len(class_name):].strip()
-            params = params_str.split(' ')
-            str_pattern = r'(?P<t_str>"([^"]|\")*")'
-            float_pattern = r'(?P<t_float>[-+]?\d+\.\d+)'
-            int_pattern = r'(?P<t_int>[-+]?\d+)'
-            param_pattern = '{}=({}|{}|{})'.format(
-                name_pattern,
-                str_pattern,
-                float_pattern,
-                int_pattern
-            )
-            for param in params:
-                param_match = re.fullmatch(param_pattern, param)
-                if param_match is not None:
-                    key_name = param_match.group('name')
-                    str_v = param_match.group('t_str')
-                    float_v = param_match.group('t_float')
-                    int_v = param_match.group('t_int')
-                    if float_v is not None:
-                        obj_kwargs[key_name] = float(float_v)
-                    if int_v is not None:
-                        obj_kwargs[key_name] = int(int_v)
-                    if str_v is not None:
-                        obj_kwargs[key_name] = str_v[1:-1].replace('_', ' ')
-        else:
-            class_name = args
-        if not class_name:
+        # Tokenize the args from the console
+        tokens = tokenize(args)
+        # check if args passed
+        if args == "":
             print("** class name missing **")
             return
-        elif class_name not in HBNBCommand.classes:
+        # extract the class name
+        class_name = tokens[0]
+        # extract all params
+        params = tokens[1:]
+
+        # if class not in class
+        if class_name not in HBNBCommand.classes:
             print("** class doesn't exist **")
             return
-        if os.getenv('HBNB_TYPE_STORAGE') == 'db':
-            if not hasattr(obj_kwargs, 'id'):
-                obj_kwargs['id'] = str(uuid.uuid4())
-            if not hasattr(obj_kwargs, 'created_at'):
-                obj_kwargs['created_at'] = str(datetime.now())
-            if not hasattr(obj_kwargs, 'updated_at'):
-                obj_kwargs['updated_at'] = str(datetime.now())
-            new_instance = HBNBCommand.classes[class_name](**obj_kwargs)
-            new_instance.save()
-            print(new_instance.id)
-        else:
-            new_instance = HBNBCommand.classes[class_name]()
-            for key, value in obj_kwargs.items():
-                if key not in ignored_attrs:
-                    setattr(new_instance, key, value)
-            new_instance.save()
-            print(new_instance.id)
+        # create a new class instance
+        new_instance = HBNBCommand.classes[class_name]()
+        # loop through all params and setattr to the object instance
+        for param in params:
+            try:
+                k, v = param.split("=")
+                v = v.replace("_", " ")
+                if v[0] == '"' and v[-1] == '"' and len(v) > 1:
+                    v = v[1:-1]
+                elif "." in v:
+                    v = float(v)
+                else:
+                    v = int(v)
+                setattr(new_instance, k, v)
+            except ValueError:
+                continue
+        new_instance.save()
+        print(new_instance.id)
+        storage.save()
 
     def help_create(self):
         """ Help information for the create method """
@@ -237,7 +227,7 @@ class HBNBCommand(cmd.Cmd):
         key = c_name + "." + c_id
 
         try:
-            storage.delete(storage.all()[key])
+            storage.delete(key)
             storage.save()
         except KeyError:
             print("** no instance found **")
@@ -256,11 +246,11 @@ class HBNBCommand(cmd.Cmd):
             if args not in HBNBCommand.classes:
                 print("** class doesn't exist **")
                 return
-            for k, v in storage.all().items():
+            for k, v in storage.all(self.classes[args]).items():
                 if k.split('.')[0] == args:
                     print_list.append(str(v))
         else:
-            for k, v in storage.all().items():
+            for k, v in storage.all(None).items():
                 print_list.append(str(v))
 
         print(print_list)
@@ -369,6 +359,17 @@ class HBNBCommand(cmd.Cmd):
         """ Help information for the update class """
         print("Updates an object with new information")
         print("Usage: update <className> <id> <attName> <attVal>\n")
+
+    def do_clear(self, args):
+        """Clears the screen
+
+        Args:
+            args(str): console args
+        """
+        if os.name == 'nt':
+            os.system('cls')
+        else:
+            os.system('clear')
 
 
 if __name__ == "__main__":

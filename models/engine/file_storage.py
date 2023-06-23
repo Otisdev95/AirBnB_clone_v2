@@ -10,26 +10,33 @@ class FileStorage:
 
     def all(self, cls=None):
         """Returns a dictionary of models currently in storage"""
-        if cls is None:
-            return self.__objects
-        cls_name = cls.__name__
-        dct = {}
-        for key in self.__objects.keys():
-            if key.split('.')[0] == cls_name:
-                dct[key] = self.__objects[key]
-        return dct
+        # New temp to store all class
+        new_dict = {}
+        data_dict = self.__objects
+        if cls:
+            if type(cls) == str:
+                cls = eval(cls)
+            for key in data_dict.keys():
+                # remove the . from te key
+                key_dot_stripped = key.replace(".", " ")
+                # new key array
+                new_key = key_dot_stripped.split()
+                # if class name is same as name in the key
+                if (cls.__name__ == new_key[0]):
+                    new_dict[key] = self.__objects[key]
+            return new_dict
+        else:
+            return FileStorage.__objects
 
     def new(self, obj):
         """Adds new object to storage dictionary"""
-        self.__objects.update(
-            {obj.to_dict()['__class__'] + '.' + obj.id: obj}
-            )
+        self.all().update({obj.to_dict()['__class__'] + '.' + obj.id: obj})
 
     def save(self):
         """Saves storage dictionary to file"""
-        with open(self.__file_path, 'w') as f:
+        with open(FileStorage.__file_path, 'w') as f:
             temp = {}
-            temp.update(self.__objects)
+            temp.update(FileStorage.__objects)
             for key, val in temp.items():
                 temp[key] = val.to_dict()
             json.dump(temp, f)
@@ -45,13 +52,13 @@ class FileStorage:
         from models.review import Review
 
         classes = {
-                    'BaseModel': BaseModel, 'User': User, 'Place': Place,
-                    'State': State, 'City': City, 'Amenity': Amenity,
-                    'Review': Review
-                  }
+            'BaseModel': BaseModel, 'User': User, 'Place': Place,
+            'State': State, 'City': City, 'Amenity': Amenity,
+            'Review': Review
+        }
         try:
             temp = {}
-            with open(self.__file_path, 'r') as f:
+            with open(FileStorage.__file_path, 'r') as f:
                 temp = json.load(f)
                 for key, val in temp.items():
                     self.all()[key] = classes[val['__class__']](**val)
@@ -59,15 +66,27 @@ class FileStorage:
             pass
 
     def delete(self, obj=None):
-        ''' deletes the object obj from the attribute
-            __objects if it's inside it
-        '''
-        if obj is None:
-            return
-        obj_key = obj.to_dict()['__class__'] + '.' + obj.id
-        if obj_key in self.__objects.keys():
-            del self.__objects[obj_key]
+        """delete an objects
+
+        Args:
+            obj (None, optional): class object
+        """
+        if obj:
+            # get key
+            key = "{}.{}".format(type(obj).__name__, obj.id)
+            del self.__objects[key]
 
     def close(self):
-        """Call the reload method"""
+        """ Reloads storage
+        """
         self.reload()
+
+    @classmethod
+    def set_path(cls, file_path: str):
+        """To change the save file path."""
+        cls.__file_path = file_path
+
+    @classmethod
+    def new_object(cls):
+        """Object storage."""
+        cls.__objects = {}
